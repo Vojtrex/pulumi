@@ -1,0 +1,10 @@
+name: aws-python
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: A quickstart project for pululmi infrastructure
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: aws-python
