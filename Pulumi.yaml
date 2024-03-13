@@ -3,7 +3,7 @@ runtime:
   name: python
   options:
     virtualenv: venv
-description: A quickstart project for pululmi infrastructure
+description: A quickstart project for pulumi infrastructure
 config:
   pulumi:tags:
     value:

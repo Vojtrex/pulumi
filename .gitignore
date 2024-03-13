@@ -1,2 +1,29 @@
+# Python
 *.pyc
+*.pyo
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Pulumi
+.pulumi/
+
+
+# JetBrains IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+out/
+.idea/
+
+# Virtual Environment
 venv/
+env/
+
+# Miscellaneous
+.DS_Store
+__MACOSX/
+Thumbs.db

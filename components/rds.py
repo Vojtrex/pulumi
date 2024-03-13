@@ -1,5 +1,6 @@
 import pulumi
 import pulumi_aws as aws
+import pulumi_aws_native as aws_native
 import sys
 import os
 
@@ -15,9 +16,10 @@ import vars
 # Create the Aurora Serverless v2 cluster using the AWS-native provider which uses the AWS Cloud Control API
 aurora_cluster = aws_native.rds.DbCluster("aurora_cluster",
                                           engine="aurora-postgresql",
-                                          database_name="mydatabase",
-                                          master_username="postgres",
-                                          master_user_password="mysecurepassword",
+                                          database_name=vars.db_name,
+                                          master_username=vars.db_master_username,
+                                          master_user_password=vars.db_master_password,
+                                          availability_zones=[aws_availiability_zone_a, aws_availiability_zone_b],
                                           db_subnet_group_name=vpc.group.name,
                                           vpc_security_group_ids=[vpc.security_group_db.id],
                                           # ServerlessV2 configuration specifying min and max capacity

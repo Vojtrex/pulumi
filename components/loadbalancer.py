@@ -34,4 +34,4 @@ wl = aws.lb.Listener('web',
                      )],
                      )
 
-export('url', alb.dns_name)
+pulumi.export('url', alb.dns_name)

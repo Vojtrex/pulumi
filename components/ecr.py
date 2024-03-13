@@ -14,6 +14,7 @@ import vars
 # Create an AWS ECR Repository to store Docker images
 repo = aws.ecr.Repository(
     vars.project_name,
+    name=vars.repository_name,
     image_tag_mutability="MUTABLE"
 )
 
@@ -43,7 +44,7 @@ ecr_policy = {
 }
 
 policy = aws.ecr.RepositoryPolicy("policy",
-                                  repository=repo.name,
+                                  repository=vars.repository_name,
                                   policy=pulumi.Output.from_input(ecr_policy).apply(lambda x: pulumi.Output.secret(x))
                                   )
 

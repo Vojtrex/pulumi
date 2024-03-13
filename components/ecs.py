@@ -1,4 +1,3 @@
-
 import pulumi
 import pulumi_aws as aws
 import json
@@ -51,8 +50,8 @@ task_definition = aws.ecs.TaskDefinition('app-task',
                                              'name': vars.container_name,
                                              'image': vars.image_name,
                                              'portMappings': [{
-                                                 'containerPort': 80,
-                                                 'hostPort': 80,
+                                                 'containerPort': vars.container_port,
+                                                 'hostPort': vars.container_port,
                                                  'protocol': 'tcp'
                                              }]
                                          }])
@@ -71,8 +70,8 @@ service = aws.ecs.Service('app-svc',
                           load_balancers=[aws.ecs.ServiceLoadBalancerArgs(
                               target_group_arn=loadbalancer.atg.arn,
                               container_name=vars.container_name,
-                              container_port=80,
+                              container_port=vars.container_port,
                           )],
-                          opts=ResourceOptions(depends_on=[wl]),
+                          opts=pulumi.ResourceOptions(depends_on=[loadbalancer.wl]),
                           )
 
