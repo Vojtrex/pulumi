@@ -1,41 +1,50 @@
 import json
 import pulumi
 import pulumi_aws as aws
+import sys
+import os
+
+# Python needs to link parent folder path to access modules in parent directory
+current_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+import vars
 
 # Create an AWS ECR Repository to store Docker images
-repo = aws.ecr.Repository("django")
+repo = aws.ecr.Repository(
+    vars.project_name,
+    image_tag_mutability="MUTABLE"
+)
 
 # Output the repository URL
 pulumi.export('repositoryUrl', repo.repository_url)
-
+pulumi.export('repositoryName', repo.name)
 
 # Define an IAM policy to control access to the ECR repository.
-def repository_policy(repo_url):
-    return {
-        "Version": "2012-10-17",
-        "Statement": [{
+ecr_policy = {
+    "Version": "2008-10-17",
+    "Statement": [
+        {
             "Sid": "AllowPushPull",
             "Effect": "Allow",
-            "Principal": "*",  # Specify the ARN of the IAM entity here
+            "Principal": "*",  # or alternatively { "AWS": ["arn:aws:iam::awsAccountIdGoesHere:root"] }
             "Action": [
-                "ecr:GetDownloadUrlForLayer",
-                "ecr:BatchGetImage",
                 "ecr:BatchCheckLayerAvailability",
-                "ecr:PutImage",
-                "ecr:InitiateLayerUpload",
-                "ecr:UploadLayerPart",
+                "ecr:BatchGetImage",
                 "ecr:CompleteLayerUpload",
-            ],
-            "Resource": repo_url
-        }]
-    }
-
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:InitiateLayerUpload",
+                "ecr:PutImage",
+                "ecr:UploadLayerPart"
+            ]
+        }
+    ]
+}
 
 policy = aws.ecr.RepositoryPolicy("policy",
                                   repository=repo.name,
-                                  policy=repo.repository_url.apply(
-                                      lambda url: pulumi.Output.from_input(repository_policy(url)).apply(
-                                          lambda policy: json.dumps(policy)))
+                                  policy=pulumi.Output.from_input(ecr_policy).apply(lambda x: pulumi.Output.secret(x))
                                   )
 
 # The registry ID and repository URL are output by the program so they can be consumed by CI/CD pipelines.
