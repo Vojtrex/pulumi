@@ -25,6 +25,8 @@ db_name = f'{service_name}-db'
 db_master_username = 'postgres'
 db_master_password = '1234'
 
+bucket_id = f'{service_name}-bucket'
+
 # ----------------------------------------------------- #
 #                                                       #
 #                                                       #

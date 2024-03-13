@@ -19,12 +19,14 @@ aurora_cluster = aws_native.rds.DbCluster("aurora_cluster",
                                           database_name=vars.db_name,
                                           master_username=vars.db_master_username,
                                           master_user_password=vars.db_master_password,
-                                          availability_zones=[aws_availiability_zone_a, aws_availiability_zone_b],
+                                          availability_zones=[vars.aws_availiability_zone_a,
+                                                              vars.aws_availiability_zone_b],
                                           db_subnet_group_name=vpc.group.name,
                                           vpc_security_group_ids=[vpc.security_group_db.id],
                                           # ServerlessV2 configuration specifying min and max capacity
                                           serverless_v2_scaling_configuration={
-                                              "min_capacity": 0.5, # Aurora Serverless v2 allows for more granularity in capacity settings
+                                              "min_capacity": 0.5,
+                                              # Aurora Serverless v2 allows for more granularity in capacity settings
                                               "max_capacity": 64  # Adjust the max capacity based on your needs
                                           })
 
