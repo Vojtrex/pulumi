@@ -1,1 +1,1 @@
-__all__ = ["ecr", "ecs", "loadbalancer", "rds", "vpc"]
+__all__ = ["ecr", "ecs", "loadbalancer", "rds", "s3", "vpc"]

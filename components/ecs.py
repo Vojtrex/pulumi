@@ -64,7 +64,7 @@ service = aws.ecs.Service('app-svc',
                           task_definition=task_definition.arn,
                           network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
                               assign_public_ip=True,
-                              subnets=vpc.default_vpc_subnets.ids,
+                              subnets=[vpc.default_subnet_1.id, vpc.default_subnet_2.id],
                               security_groups=[vpc.group.id],
                           ),
                           load_balancers=[aws.ecs.ServiceLoadBalancerArgs(

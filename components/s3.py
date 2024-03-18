@@ -3,7 +3,7 @@ import pulumi_aws as aws
 import sys
 import os
 
-import vpc
+from components import vpc
 
 # Python needs to link parent folder path to access modules in parent directory
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -21,7 +21,7 @@ s3_endpoint = aws.ec2.VpcEndpoint("s3Endpoint",
                                   vpc_id=vpc.default_vpc.id,
                                   service_name=f'com.amazonaws.{vars.aws_zone}.s3',
                                   route_table_ids=[aws.ec2.get_route_table(vpc_id=vpc.default_vpc.id).id],
-                                  subnet_ids=[vpc.default_vpc_subnets.ids])
+                                  subnet_ids=[vpc.default_subnet_1.id, vpc.default_subnet_2.id])
 
 # Create a Security Group that allows unlimited access only from the subnet
 s3_security_group = aws.ec2.SecurityGroup("s3SecurityGroup",
@@ -31,7 +31,7 @@ s3_security_group = aws.ec2.SecurityGroup("s3SecurityGroup",
                                               protocol="-1",
                                               from_port=0,
                                               to_port=0,
-                                              cidr_blocks=[aws.ec2.get_subnet(subnet_id=vpc.default_vpc_subnets.ids).cidr_block]
+                                              cidr_blocks=[vpc.default_subnet_1.cidr_block, vpc.default_subnet_2.cidr_block]
                                           )])
 
 # Create a resource policy for the S3 bucket to enforce the restriction so that only the VPC endpoint can access it
