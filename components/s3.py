@@ -1,3 +1,6 @@
+import json
+from _operator import index
+
 import pulumi
 import pulumi_aws as aws
 import sys
@@ -20,8 +23,7 @@ s3_bucket = aws.s3.Bucket(vars.bucket_id,
 s3_endpoint = aws.ec2.VpcEndpoint("s3Endpoint",
                                   vpc_id=vpc.default_vpc.id,
                                   service_name=f'com.amazonaws.{vars.aws_zone}.s3',
-                                  route_table_ids=[aws.ec2.get_route_table(vpc_id=vpc.default_vpc.id).id],
-                                  subnet_ids=[vpc.default_subnet_1.id, vpc.default_subnet_2.id])
+                                  route_table_ids=[aws.ec2.get_route_table(vpc_id=vpc.default_vpc.id).id])
 
 # Create a Security Group that allows unlimited access only from the subnet
 s3_security_group = aws.ec2.SecurityGroup("s3SecurityGroup",
@@ -35,31 +37,34 @@ s3_security_group = aws.ec2.SecurityGroup("s3SecurityGroup",
                                                            vpc.default_subnet_2.cidr_block]
                                           )])
 
+
 # Create a resource policy for the S3 bucket to enforce the restriction so that only the VPC endpoint can access it
-s3_bucket_policy = aws.s3.BucketPolicy("s3BucketPolicy",
-                                       bucket=s3_bucket.id,
-                                       policy=s3_bucket.arn.apply(lambda arn: f"""
-                                       {{
-                                         "Version": "2012-10-17",
-                                         "Statement": [
-                                           {{
-                                             "Effect": "Deny",
-                                             "Principal": "*",
-                                             "Action": "s3:*",
-                                             "Resource": [
-                                                "{arn}/*",
-                                                "{arn}"
-                                             ],
-                                             "Condition": {{
-                                                "StringNotEquals": {{
-                                                    "aws:sourceVpce": "{s3_endpoint.id}"
-                                                }}
-                                             }}
-                                           }}
-                                         ]
-                                       }}
-                                       """))
+def internal_policy_for_bucket(bucket_name):
+    return pulumi.Output.json_dumps({
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": [
+                "s3:*"
+            ],
+            "Resource": [
+                pulumi.Output.format("arn:aws:s3:::{0}/*", bucket_name),
+            ],
+            "Condition": {
+                "StringNotEquals": {
+                    "aws:sourceVpce": "{s3_endpoint.id}"
+                }
+            }
+        }]
+    })
+
+
+# Attaching the policy to the bucket
+bucket_policy = aws.s3.BucketPolicy("bucket-policy",
+                                    bucket=s3_bucket.id,
+                                    policy=internal_policy_for_bucket(s3_bucket.id))
 
 # Export the URL of the bucket and the name of the security group
-pulumi.export("bucket_url", s3_bucket.website_endpoint)
-pulumi.export("security_group_name", s3_security_group.name)
+pulumi.export("s3_bucket_url", s3_bucket.website_endpoint)
+pulumi.export("s3_security_group_name", s3_security_group.name)
