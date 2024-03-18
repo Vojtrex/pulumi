@@ -31,7 +31,8 @@ s3_security_group = aws.ec2.SecurityGroup("s3SecurityGroup",
                                               protocol="-1",
                                               from_port=0,
                                               to_port=0,
-                                              cidr_blocks=[vpc.default_subnet_1.cidr_block, vpc.default_subnet_2.cidr_block]
+                                              cidr_blocks=[vpc.default_subnet_1.cidr_block,
+                                                           vpc.default_subnet_2.cidr_block]
                                           )])
 
 # Create a resource policy for the S3 bucket to enforce the restriction so that only the VPC endpoint can access it
