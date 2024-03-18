@@ -8,7 +8,6 @@ aws_id = '598479110370'
 aws_user = 'pulumi'
 aws_zone = 'eu-central-1'
 
-
 # ----------------------------------------------------- #
 #                                                       #
 #                       DJANGO                          #
@@ -21,9 +20,9 @@ container_port = 80
 image_name = service_name
 
 cluster_name = f'{service_name}-cluster'
-db_name = f'{service_name}-db'
+db_name = f'{service_name}'
 db_master_username = 'postgres'
-db_master_password = '1234'
+db_master_password = '12345678'
 
 bucket_id = f'{service_name}-bucket-unique-name'
 
