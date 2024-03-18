@@ -17,17 +17,19 @@ default_vpc = aws.ec2.get_vpc(default=True)
 # Get all subnets in the default VPC
 subnets = aws.ec2.get_subnets(filters=[{"name": "vpc-id", "values": [default_vpc.id]}])
 
-# Retrieve the existing subnet information for the first two subnets
+# Retrieve the existing subnet information for the first three subnets
 default_subnet_1 = aws.ec2.Subnet.get("default_subnet_1", subnets.ids[0])
 default_subnet_2 = aws.ec2.Subnet.get("default_subnet_2", subnets.ids[1])
+default_subnet_3 = aws.ec2.Subnet.get("default_subnet_3", subnets.ids[2])
 
 # Get a list of all availability zones in the region
 availability_zones = aws.get_availability_zones()
 pulumi.export('availability_zones', availability_zones.names)
 
-# Export the IDs of the created subnets
+# Export the IDs of the default subnets
 pulumi.export('default_subnet_1_id', default_subnet_1.id)
 pulumi.export('default_subnet_2_id', default_subnet_2.id)
+pulumi.export('default_subnet_3_id', default_subnet_3.id)
 
 # Create a SecurityGroup that permits HTTP ingress and unrestricted egress.
 group = aws.ec2.SecurityGroup('web-secgrp',

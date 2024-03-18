@@ -40,15 +40,18 @@ rpa = aws.iam.RolePolicyAttachment('task-exec-policy',
 
 # Spin up a load balanced service running our container image.
 task_definition = aws.ecs.TaskDefinition('app-task',
-                                         family='fargate-task-definition',
-                                         cpu='256',
-                                         memory='512',
+                                         family=vars.service_name,
+                                         cpu='1024',
+                                         memory='2048',
                                          network_mode='awsvpc',
                                          requires_compatibilities=['FARGATE'],
                                          execution_role_arn=role.arn,
                                          container_definitions=json.dumps([{
                                              'name': vars.container_name,
                                              'image': vars.image_name,
+                                             'cpu': 1024,
+                                             'memory': 2048,
+                                             'essential': True,
                                              'portMappings': [{
                                                  'containerPort': vars.container_port,
                                                  'hostPort': vars.container_port,
@@ -59,7 +62,7 @@ task_definition = aws.ecs.TaskDefinition('app-task',
 
 service = aws.ecs.Service('app-svc',
                           cluster=cluster.arn,
-                          desired_count=3,
+                          desired_count=1,
                           launch_type='FARGATE',
                           task_definition=task_definition.arn,
                           network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(

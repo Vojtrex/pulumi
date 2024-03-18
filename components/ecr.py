@@ -13,7 +13,7 @@ import vars
 
 # Create an AWS ECR Repository to store Docker images
 repo = aws.ecr.Repository(
-    vars.project_name,
+    vars.service_name,
     name=vars.repository_name,
     image_tag_mutability="MUTABLE"
 )
@@ -45,7 +45,8 @@ ecr_policy = {
 
 policy = aws.ecr.RepositoryPolicy("policy",
                                   repository=vars.repository_name,
-                                  policy=pulumi.Output.from_input(ecr_policy).apply(lambda x: pulumi.Output.secret(x))
+                                  policy=pulumi.Output.from_input(ecr_policy).apply(lambda x: pulumi.Output.secret(x)),
+                                  opts=pulumi.ResourceOptions(depends_on=[repo]),
                                   )
 
 # The registry ID and repository URL are output by the program so they can be consumed by CI/CD pipelines.

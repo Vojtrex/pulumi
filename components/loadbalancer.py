@@ -15,7 +15,7 @@ import vars
 # Create a load balancer to listen for HTTP traffic on port 80.
 alb = aws.lb.LoadBalancer('app-lb',
                           security_groups=[vpc.group.id],
-                          subnets=[vpc.default_subnet_1.id, vpc.default_subnet_2.id],
+                          subnets=[vpc.default_subnet_1.id, vpc.default_subnet_2.id, vpc.default_subnet_3.id],
                           )
 
 atg = aws.lb.TargetGroup('app-tg',
@@ -23,6 +23,16 @@ atg = aws.lb.TargetGroup('app-tg',
                          protocol='HTTP',
                          target_type='ip',
                          vpc_id=vpc.default_vpc.id,
+                         health_check={
+                             'path': '/',
+                             'port': 80,
+                             'protocol': 'HTTP',
+                             'healthy_threshold': 2,
+                             'unhealthy_threshold': 8,
+                             'timeout': 5,
+                             'interval': 30,
+
+                         }
                          )
 
 wl = aws.lb.Listener('web',
