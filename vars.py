@@ -10,21 +10,40 @@ aws_zone = 'eu-central-1'
 
 # ----------------------------------------------------- #
 #                                                       #
-#                       DJANGO                          #
+#                       AUDIOSYSTEM                          #
 #                                                       #
 # ----------------------------------------------------- #
-service_name = 'django'
-repository_name = service_name
-container_name = service_name
-container_port = 80
-image_name = service_name
+audiosystem_service_name = 'audiosystem'
+audiosystem_repository_name = audiosystem_service_name
+audiosystem_container_name = audiosystem_service_name
+audiosystem_container_port = 80
+audiosystem_image_name = audiosystem_service_name
 
-cluster_name = f'{service_name}-cluster'
-db_name = f'{service_name}'
-db_master_username = 'postgres'
-db_master_password = '12345678'
+audiosystem_cluster_name = f'{audiosystem_service_name}-cluster'
+audiosystem_db_name = f'{audiosystem_service_name}'
+audiosystem_db_master_username = 'postgres'
+audiosystem_db_master_password = '12345678'
 
-bucket_id = f'{service_name}-bucket-unique-name'
+audiosystem_bucket_id = f'{audiosystem_service_name}-bucket-unique-name'
+
+# ----------------------------------------------------- #
+#                                                       #
+#                       AUDIOSYSTEM                          #
+#                                                       #
+# ----------------------------------------------------- #
+edna_service_name = 'edna'
+edna_repository_name = edna_service_name
+edna_container_name = edna_service_name
+edna_container_port = 80
+edna_image_name = edna_service_name
+
+edna_cluster_name = f'{edna_service_name}-cluster'
+edna_db_name = f'{edna_service_name}'
+edna_db_master_username = 'postgres'
+edna_db_master_password = '12345678'
+
+edna_bucket_id = f'{edna_service_name}-bucket-unique-name'
+
 
 # ----------------------------------------------------- #
 #                                                       #
