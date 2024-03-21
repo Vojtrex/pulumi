@@ -10,6 +10,18 @@ aws_zone = 'eu-central-1'
 
 # ----------------------------------------------------- #
 #                                                       #
+#                        DATABASE                       #
+#                                                       #
+# ----------------------------------------------------- #
+
+database_name = "aurora"
+database_cluster_name = f'{database_name}-cluster'
+database_master_username = 'postgres'
+database_master_password = '12345678'
+database_port = 5432
+
+# ----------------------------------------------------- #
+#                                                       #
 #                       AUDIOSYSTEM                     #
 #                                                       #
 # ----------------------------------------------------- #
