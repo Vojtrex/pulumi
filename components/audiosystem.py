@@ -10,6 +10,7 @@ from components import vpc
 current_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
+
 import vars
 
 # ----------------------------------------------------- #
@@ -38,6 +39,7 @@ ecr_policy_json = {
             "Effect": "Allow",
             "Principal": "*",  # or alternatively { "AWS": ["arn:aws:iam::awsAccountIdGoesHere:root"] }
             "Action": [
+                "ecr:GetAuthorizationToken",
                 "ecr:BatchCheckLayerAvailability",
                 "ecr:BatchGetImage",
                 "ecr:CompleteLayerUpload",
@@ -69,7 +71,7 @@ pulumi.export(f"{vars.audiosystem_service_name}_registryId", ecr_repository.regi
 # Create a load balancer to listen for HTTP traffic on port 80.
 loadbalancer = aws.lb.LoadBalancer(f"{vars.audiosystem_service_name}_loadbalancer",
                                    name=f"{vars.audiosystem_service_name}-loadbalancer",
-                                   security_groups=[vpc.group.id],
+                                   security_groups=[vpc.security_group_allow_all_traffic.id],
                                    subnets=[vpc.default_subnet_1.id, vpc.default_subnet_2.id, vpc.default_subnet_3.id],
                                    )
 
@@ -121,7 +123,7 @@ listener_rule_redirect_to_https = aws.lb.ListenerRule(
         ),
     )],
     priority=100
-    )
+)
 
 # Fixed-response action
 listener_rule_health_check = aws.lb.ListenerRule(f"{vars.audiosystem_service_name}_listener_rule_health_check",
@@ -146,7 +148,7 @@ listener_rule_health_check = aws.lb.ListenerRule(f"{vars.audiosystem_service_nam
                                                      ],
                                                  )])
 
-pulumi.export('url', loadbalancer.dns_name)
+pulumi.export(f"{vars.audiosystem_service_name}_url", loadbalancer.dns_name)
 
 # ----------------------------------------------------- #
 #                                                       #
@@ -173,6 +175,56 @@ iam_role_ecs_task_exec_role = aws.iam.Role(f"{vars.audiosystem_service_name}_iam
                                            }),
                                            )
 
+default_task_execution_policy = aws.iam.Policy("defaultTaskExecutionPolicy",
+                                               description="Default Fargate Task Execution Policy",
+                                               policy="""{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:PutLogEvents",
+                    "ecs:ListTasks",
+                    "ecs:DescribeTasks",
+                    "ecs:StartTask",
+                    "ecs:StopTask",
+                    "ecr:GetAuthorizationToken"
+                ],
+                "Resource": "*"
+            }
+        ]
+    }"""
+                                               )
+
+# Attach the policy to the ECS task execution role
+ecr_policy_attachment = aws.iam.RolePolicyAttachment("ecrPolicyAttachment",
+                                                     policy_arn=default_task_execution_policy.arn,
+                                                     role=iam_role_ecs_task_exec_role.name
+                                                     )
+
+# Define the container definitions with the ECR image URI
+container_definitions = pulumi.Output.all(ecr_repository.repository_url).apply(lambda args: json.dumps([{
+    'name': vars.audiosystem_container_name,
+    'image': f"{args[0]}:latest",
+    'cpu': 1024,
+    'memory': 2048,
+    'essential': True,
+    'portMappings': [{
+        'containerPort': vars.audiosystem_container_port,
+        'hostPort': vars.audiosystem_container_port,
+        'protocol': 'tcp'
+    }],
+    "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"],
+        "interval": 20,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+    }
+}]))
+
 # Spin up a load balanced service running our container image.
 task_definition = aws.ecs.TaskDefinition(f"{vars.audiosystem_service_name}_task_definition",
                                          family=vars.audiosystem_service_name,
@@ -181,18 +233,7 @@ task_definition = aws.ecs.TaskDefinition(f"{vars.audiosystem_service_name}_task_
                                          network_mode='awsvpc',
                                          requires_compatibilities=['FARGATE'],
                                          execution_role_arn=iam_role_ecs_task_exec_role.arn,
-                                         container_definitions=json.dumps([{
-                                             'name': vars.audiosystem_container_name,
-                                             'image': vars.audiosystem_image_name,
-                                             'cpu': 1024,
-                                             'memory': 2048,
-                                             'essential': True,
-                                             'portMappings': [{
-                                                 'containerPort': vars.audiosystem_container_port,
-                                                 'hostPort': vars.audiosystem_container_port,
-                                                 'protocol': 'tcp'
-                                             }]
-                                         }])
+                                         container_definitions=container_definitions,
                                          )
 # Create an ECS service
 ecs_service = aws.ecs.Service(f"{vars.audiosystem_service_name}_ecs_service",
@@ -203,7 +244,7 @@ ecs_service = aws.ecs.Service(f"{vars.audiosystem_service_name}_ecs_service",
                               network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
                                   assign_public_ip=True,
                                   subnets=[vpc.default_subnet_1.id, vpc.default_subnet_2.id, vpc.default_subnet_3.id],
-                                  security_groups=[vpc.group.id],
+                                  security_groups=[vpc.security_group_allow_all_traffic.id],
                               ),
                               load_balancers=[aws.ecs.ServiceLoadBalancerArgs(
                                   target_group_arn=target_group.arn,
@@ -213,105 +254,99 @@ ecs_service = aws.ecs.Service(f"{vars.audiosystem_service_name}_ecs_service",
                               opts=pulumi.ResourceOptions(depends_on=[listener]),
                               )
 
-# Register  ECS Service with the Target Group
-ecs_service_attachment = aws.lb.TargetGroupAttachment(f"{vars.audiosystem_service_name}_ecs_service_attachment",
-                                                      target_group_arn=target_group.arn,
-                                                      target_id=ecs_service.id,
-                                                      port=80)
-
-# ----------------------------------------------------- #
-#                                                       #
-#                        Database                       #
-#                                                       #
-# ----------------------------------------------------- #
-
-# Create the Aurora Serverless v2 cluster
-aurora_cluster = aws.rds.Cluster(f"{vars.audiosystem_service_name}_aurora_cluster",
-                                 cluster_identifier=vars.audiosystem_cluster_name,
-                                 engine="aurora-postgresql",
-                                 engine_mode='provisioned',
-                                 engine_version="16.1",
-                                 database_name=vars.audiosystem_db_name,
-                                 master_username=vars.audiosystem_db_master_username,
-                                 master_password=vars.audiosystem_db_master_password,
-                                 storage_encrypted=True,
-                                 vpc_security_group_ids=[vpc.security_group_db.id],
-                                 skip_final_snapshot=True,
-                                 serverlessv2_scaling_configuration=aws.rds.ClusterServerlessv2ScalingConfigurationArgs(
-                                     min_capacity=0.5,
-                                     max_capacity=1,
-                                 ))
-
-# Create a Aurora Cluster Instance
-aurora_cluster_instance = aws.rds.ClusterInstance(f"{vars.audiosystem_service_name}_aurora_cluster_instance",
-                                                  cluster_identifier=aurora_cluster.id,
-                                                  instance_class="db.serverless",
-                                                  engine=aurora_cluster.engine,
-                                                  engine_version=aurora_cluster.engine_version,
-                                                  publicly_accessible=True,
-                                                  )
-
-# Export the cluster endpoint to allow connections to the database
-pulumi.export(f"{vars.audiosystem_service_name}_cluster_endpoint", aurora_cluster.endpoint)
-
-# ----------------------------------------------------- #
-#                                                       #
-#                       S3 Bucket                       #
-#                                                       #
-# ----------------------------------------------------- #
-
-# Create an AWS S3 Bucket with a custom identifier
-s3_bucket = aws.s3.Bucket(f"{vars.audiosystem_service_name}_s3_bucket",
-                          bucket=vars.audiosystem_bucket_id)
-
-# Create a VPC Endpoint for S3, this will route traffic within AWS Network
-s3_endpoint = aws.ec2.VpcEndpoint(f"{vars.audiosystem_service_name}_s3_endpoint",
-                                  vpc_id=vpc.default_vpc.id,
-                                  service_name=f'com.amazonaws.{vars.aws_zone}.s3',
-                                  route_table_ids=[aws.ec2.get_route_table(vpc_id=vpc.default_vpc.id).id])
-
-# Create a Security Group that allows unlimited access only from the subnet
-s3_security_group = aws.ec2.SecurityGroup(f"{vars.audiosystem_service_name}_s3_security_group",
-                                          description="Allow unlimited access to S3 from within the subnet",
-                                          vpc_id=vpc.default_vpc.id,
-                                          ingress=[aws.ec2.SecurityGroupIngressArgs(
-                                              protocol="-1",
-                                              from_port=0,
-                                              to_port=0,
-                                              cidr_blocks=[vpc.default_subnet_1.cidr_block,
-                                                           vpc.default_subnet_2.cidr_block,
-                                                           vpc.default_subnet_3.cidr_block,
-                                                           ]
-                                          )])
-
-
-# Create a resource policy for the S3 bucket to enforce the restriction so that only the VPC endpoint can access it
-def internal_policy_for_bucket(bucket_name):
-    return pulumi.Output.json_dumps({
-        "Version": "2012-10-17",
-        "Statement": [{
-            "Effect": "Deny",
-            "Principal": "*",
-            "Action": [
-                "s3:*"
-            ],
-            "Resource": [
-                pulumi.Output.format("arn:aws:s3:::{0}/*", bucket_name),
-            ],
-            "Condition": {
-                "StringNotEquals": {
-                    "aws:sourceVpce": "{s3_endpoint.id}"
-                }
-            }
-        }]
-    })
-
-
-# Attaching the policy to the bucket
-s3_bucket_policy = aws.s3.BucketPolicy(f"{vars.audiosystem_service_name}_s3_bucket_policy",
-                                       bucket=s3_bucket.id,
-                                       policy=internal_policy_for_bucket(s3_bucket.id))
-
-# Export the URL of the bucket and the name of the security group
-pulumi.export("s3_bucket_url", s3_bucket.website_endpoint)
-pulumi.export("s3_security_group_name", s3_security_group.name)
+# # ----------------------------------------------------- #
+# #                                                       #
+# #                        Database                       #
+# #                                                       #
+# # ----------------------------------------------------- #
+#
+# # Create the Aurora Serverless v2 cluster
+# aurora_cluster = aws.rds.Cluster(f"{vars.audiosystem_service_name}_aurora_cluster",
+#                                  cluster_identifier=vars.audiosystem_cluster_name,
+#                                  engine="aurora-postgresql",
+#                                  engine_mode='provisioned',
+#                                  engine_version="16.1",
+#                                  database_name=vars.audiosystem_db_name,
+#                                  master_username=vars.audiosystem_db_master_username,
+#                                  master_password=vars.audiosystem_db_master_password,
+#                                  storage_encrypted=True,
+#                                  vpc_security_group_ids=[vpc.security_group_db.id],
+#                                  skip_final_snapshot=True,
+#                                  serverlessv2_scaling_configuration=aws.rds.ClusterServerlessv2ScalingConfigurationArgs(
+#                                      min_capacity=0.5,
+#                                      max_capacity=1,
+#                                  ))
+#
+# # Create a Aurora Cluster Instance
+# aurora_cluster_instance = aws.rds.ClusterInstance(f"{vars.audiosystem_service_name}_aurora_cluster_instance",
+#                                                   cluster_identifier=aurora_cluster.id,
+#                                                   instance_class="db.serverless",
+#                                                   engine=aurora_cluster.engine,
+#                                                   engine_version=aurora_cluster.engine_version,
+#                                                   publicly_accessible=True,
+#                                                   )
+#
+# # Export the cluster endpoint to allow connections to the database
+# pulumi.export(f"{vars.audiosystem_service_name}_cluster_endpoint", aurora_cluster.endpoint)
+#
+# # ----------------------------------------------------- #
+# #                                                       #
+# #                       S3 Bucket                       #
+# #                                                       #
+# # ----------------------------------------------------- #
+#
+# # Create an AWS S3 Bucket with a custom identifier
+# s3_bucket = aws.s3.Bucket(f"{vars.audiosystem_service_name}_s3_bucket",
+#                           bucket=vars.audiosystem_bucket_id)
+#
+# # Create a VPC Endpoint for S3, this will route traffic within AWS Network
+# s3_endpoint = aws.ec2.VpcEndpoint(f"{vars.audiosystem_service_name}_s3_endpoint",
+#                                   vpc_id=vpc.default_vpc.id,
+#                                   service_name=f'com.amazonaws.{vars.aws_zone}.s3',
+#                                   route_table_ids=[aws.ec2.get_route_table(vpc_id=vpc.default_vpc.id).id])
+#
+# # Create a Security Group that allows unlimited access only from the subnet
+# s3_security_group = aws.ec2.SecurityGroup(f"{vars.audiosystem_service_name}_s3_security_group",
+#                                           description="Allow unlimited access to S3 from within the subnet",
+#                                           vpc_id=vpc.default_vpc.id,
+#                                           ingress=[aws.ec2.SecurityGroupIngressArgs(
+#                                               protocol="-1",
+#                                               from_port=0,
+#                                               to_port=0,
+#                                               cidr_blocks=[vpc.default_subnet_1.cidr_block,
+#                                                            vpc.default_subnet_2.cidr_block,
+#                                                            vpc.default_subnet_3.cidr_block,
+#                                                            ]
+#                                           )])
+#
+#
+# # Create a resource policy for the S3 bucket to enforce the restriction so that only the VPC endpoint can access it
+# def internal_policy_for_bucket(bucket_name):
+#     return pulumi.Output.json_dumps({
+#         "Version": "2012-10-17",
+#         "Statement": [{
+#             "Effect": "Deny",
+#             "Principal": "*",
+#             "Action": [
+#                 "s3:*"
+#             ],
+#             "Resource": [
+#                 pulumi.Output.format("arn:aws:s3:::{0}/*", bucket_name),
+#             ],
+#             "Condition": {
+#                 "StringNotEquals": {
+#                     "aws:sourceVpce": "{s3_endpoint.id}"
+#                 }
+#             }
+#         }]
+#     })
+#
+#
+# # Attaching the policy to the bucket
+# s3_bucket_policy = aws.s3.BucketPolicy(f"{vars.audiosystem_service_name}_s3_bucket_policy",
+#                                        bucket=s3_bucket.id,
+#                                        policy=internal_policy_for_bucket(s3_bucket.id))
+#
+# # Export the URL of the bucket and the name of the security group
+# pulumi.export("s3_bucket_endpoint", pulumi.Output.concat("https://", bucket.bucket, ".s3.amazonaws.com")
+# pulumi.export("s3_security_group_name", s3_security_group.name)
