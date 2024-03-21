@@ -10,7 +10,7 @@ aws_zone = 'eu-central-1'
 
 # ----------------------------------------------------- #
 #                                                       #
-#                       AUDIOSYSTEM                          #
+#                       AUDIOSYSTEM                     #
 #                                                       #
 # ----------------------------------------------------- #
 audiosystem_service_name = 'audiosystem'
@@ -28,7 +28,7 @@ audiosystem_bucket_id = f'{audiosystem_service_name}-bucket-unique-name'
 
 # ----------------------------------------------------- #
 #                                                       #
-#                       AUDIOSYSTEM                          #
+#                         EDNA                          #
 #                                                       #
 # ----------------------------------------------------- #
 edna_service_name = 'edna'
