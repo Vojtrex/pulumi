@@ -313,5 +313,5 @@ s3_bucket_policy = aws.s3.BucketPolicy(f"{vars.audiosystem_service_name}_s3_buck
                                        policy=internal_policy_for_bucket(s3_bucket.id))
 
 # Export the URL of the bucket and the name of the security group
-pulumi.export("s3_bucket_endpoint", pulumi.Output.concat("https://", bucket.bucket, ".s3.amazonaws.com")
+pulumi.export("s3_bucket_endpoint", pulumi.Output.concat("https://", s3_bucket.bucket, ".s3.amazonaws.com"))
 pulumi.export("s3_security_group_name", s3_security_group.name)
